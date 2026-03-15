@@ -1,0 +1,18 @@
+{
+  "name": "gc-autotests-playwright",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Playwright rewrite of the GC autotests smoke flow",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "codegen": "playwright codegen https://georgetowncupcake.com"
+  },
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.29",
+    "@playwright/test": "^1.52.0",
+    "@types/node": "^25.5.0",
+    "typescript": "^5.8.2"
+  }
+}
