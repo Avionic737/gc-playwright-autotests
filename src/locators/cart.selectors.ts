@@ -10,5 +10,11 @@ export const SIDECART_QTY_INPUT =
 export const SIDECART_SHIPPING_VALUE =
   '#cart-form > div > div > div:nth-child(3) > div.cart-items__group-header > div > div > div:nth-child(1) > span:nth-child(2)';
 
+export const SIDECART_DATE_VALUE =
+  '#cart-form > div > div > div:nth-child(3) > div.cart-items__group-header > div > div > div:nth-child(2) > span:nth-child(2)';
+
 export const SIDECART_ZIP_VALUE =
   '#cart-form > div > div > div:nth-child(3) > div.cart-items__group-header > div > div > div:nth-child(3) > span:nth-child(2)';
+
+export const SIDECART_CHECKOUT_LINK =
+  '#header-component > div > div > div.header__column.header__column--right > header-actions > cart-drawer-component > dialog > div > cart-items-component > div.cart-drawer__content.motion-reduce > div > div > div.cart__ctas > a';

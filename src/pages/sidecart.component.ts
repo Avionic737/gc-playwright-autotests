@@ -2,6 +2,8 @@ import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
 import {
+  SIDECART_CHECKOUT_LINK,
+  SIDECART_DATE_VALUE,
   SIDECART_PRODUCT_TITLE_LINK,
   SIDECART_QTY_INPUT,
   SIDECART_SHIPPING_VALUE,
@@ -36,9 +38,21 @@ export class SideCartComponent {
     return (await element.textContent())?.trim() ?? '';
   }
 
+  async getDateValue(): Promise<string> {
+    const element = this.page.locator(SIDECART_DATE_VALUE);
+    await expect(element).toBeVisible();
+    return (await element.textContent())?.trim() ?? '';
+  }
+
   async getZipValue(): Promise<string> {
     const element = this.page.locator(SIDECART_ZIP_VALUE);
     await expect(element).toBeVisible();
     return (await element.textContent())?.trim() ?? '';
+  }
+
+  async clickCheckoutLink(): Promise<void> {
+    const element = this.page.locator(SIDECART_CHECKOUT_LINK);
+    await expect(element).toBeVisible();
+    await element.click();
   }
 }
