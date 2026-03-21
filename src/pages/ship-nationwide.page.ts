@@ -117,9 +117,7 @@ export class ShipNationwidePage {
 
   private async tryPickDateCell(cell: Locator, attempts: DeliveryDateAttempt[]): Promise<{ selectedDate: string | null }> {
     await this.dismissBlockingUi();
-    await this.openCalendarIfClosed();
-    await expect(cell).toBeVisible({ timeout: 5000 });
-    await cell.click({ force: true });
+    await this.clickCalendarCellWithRetry(cell);
 
     const selectedDate = (await this.page.locator(DELIVERY_DATE_INPUT).inputValue().catch(() => '')) || null;
     const error = await this.waitForDeliveryErrorSnapshot(4000);
@@ -211,6 +209,25 @@ export class ShipNationwidePage {
     await dateInput.dispatchEvent('click').catch(() => undefined);
   }
 
+  private async clickCalendarCellWithRetry(cell: Locator): Promise<void> {
+    const maxAttempts = 3;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        await this.openCalendarIfClosed();
+        await expect(cell).toBeVisible({ timeout: 5000 });
+        await cell.click({ force: true, timeout: 3000 });
+        return;
+      } catch (error) {
+        if (attempt === maxAttempts) {
+          throw error;
+        }
+
+        await this.page.waitForTimeout(250);
+      }
+    }
+  }
+
   private async dismissBlockingUi(): Promise<void> {
     await this.acceptCookiesIfPresent();
     await this.clickIfVisible(this.page.locator("button.klaviyo-close-form[aria-label='Close dialog']").first());
@@ -255,5 +272,6 @@ export class ShipNationwidePage {
     });
   }
 }
+
 
 
