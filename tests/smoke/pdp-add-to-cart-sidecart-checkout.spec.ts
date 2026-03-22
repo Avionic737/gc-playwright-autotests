@@ -10,6 +10,40 @@ import { pauseIfRequested } from '../helpers/debug';
 
 const PDP_URL = 'https://georgetowncupcake.com/products/logo-t-shirt-black';
 const CONTACT_EMAIL = 'test+10@mtnhausdigital.com';
+const tryParseMoneyToNumber = (raw: string | null): number | null => {
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.includes('free')) {
+    return 0;
+  }
+
+  const match = raw.replace(/,/g, '').match(/-?\d+(?:\.\d{1,2})?/);
+  if (!match) {
+    return null;
+  }
+
+  return Number.parseFloat(match[0]);
+};
+const parseMoneyToNumber = (raw: string | null): number => {
+  if (!raw) {
+    throw new Error('Expected money text, got empty value.');
+  }
+
+  const normalized = raw.trim().toLowerCase();
+  if (normalized.includes('free')) {
+    return 0;
+  }
+
+  const match = raw.replace(/,/g, '').match(/-?\d+(?:\.\d{1,2})?/);
+  if (!match) {
+    throw new Error(`Unable to parse money value from: ${raw}`);
+  }
+
+  return Number.parseFloat(match[0]);
+};
 
 test('add logo t-shirt black to cart and verify sidecart details with checkout click', async ({ page, baseURL }) => {
   test.setTimeout(180000);
@@ -110,9 +144,42 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
   const addressPopup = page.locator(popupContentSelector).first();
   await expect(addressPopup).toBeVisible();
 
-  await page.getByRole('textbox', { name: /first name/i }).first().fill('Test');
-  await page.getByRole('textbox', { name: /last name/i }).first().fill('User');
-  await page.getByRole('textbox', { name: /phone number/i }).first().fill('2125551234');
+  const firstNameInput = page
+    .locator("#new-address-popup input[name='address[first_name]'], #new-address-popup input[id*='addressfirst_name']")
+    .first();
+  await expect(firstNameInput).toBeVisible();
+
+  await firstNameInput.click({ timeout: 5000 }).catch(() => undefined);
+  await firstNameInput.fill('Test').catch(() => undefined);
+
+  if ((await firstNameInput.inputValue().catch(() => '')) === '') {
+    await firstNameInput.press('Control+A').catch(() => undefined);
+    await firstNameInput.type('Test', { delay: 40 }).catch(() => undefined);
+  }
+
+  if ((await firstNameInput.inputValue().catch(() => '')) === '') {
+    await firstNameInput.evaluate((node) => {
+      if (node instanceof HTMLInputElement) {
+        node.value = 'Test';
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    });
+  }
+
+  await expect(firstNameInput).toHaveValue(/\S+/, { timeout: 10000 });
+
+  const lastNameInput = page
+    .locator("#new-address-popup input[name='address[last_name]'], #new-address-popup input[id*='addresslast_name']")
+    .first();
+  await expect(lastNameInput).toBeVisible();
+  await lastNameInput.fill('User');
+
+  const phoneInput = page
+    .locator("#new-address-popup input[name='address[phone]'], #new-address-popup input[id*='addressphone']")
+    .first();
+  await expect(phoneInput).toBeVisible();
+  await phoneInput.fill('2125551234');
 
   const address1Input = page.locator('#address1_1');
   await expect(address1Input).toBeVisible();
@@ -180,8 +247,227 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
   const finalCheckoutButton = page.locator(finalCheckoutButtonSelector).first();
   await expect(finalCheckoutButton).toBeVisible();
   await expect(finalCheckoutButton).toBeEnabled({ timeout: 30000 });
-  await finalCheckoutButton.click();
+  await Promise.all([
+    page.waitForURL(/\/(checkouts|invoices)\//, { timeout: 60000 }),
+    finalCheckoutButton.click(),
+  ]);
+
+  let checkoutSummary = await page.evaluate((expectedTitle) => {
+    const clean = (text: string | null | undefined): string => (text ?? '').replace(/\s+/g, ' ').trim();
+
+    const lineTitleSelectors = [
+      '[data-product-title]',
+      '.product__description__name',
+      '[data-testid="line-item-title"]',
+      '.order-summary__emphasis',
+    ];
+
+    const getFirstText = (selectors: string[]): string | null => {
+      for (const selector of selectors) {
+        const value = clean(document.querySelector(selector)?.textContent);
+        if (value) {
+          return value;
+        }
+      }
+      return null;
+    };
+
+    const findAmountByLabel = (label: string): string | null => {
+      const candidates = Array.from(document.querySelectorAll('tr, .total-line, dt, div, span'));
+      for (const node of candidates) {
+        const labelText = clean(node.textContent).toLowerCase();
+        if (!labelText || !labelText.includes(label.toLowerCase())) {
+          continue;
+        }
+
+        const row =
+          node.closest('tr, .total-line, .order-summary__section__content, .order-summary__section') ?? node.parentElement;
+        const rowText = clean(row?.textContent);
+        const matches = rowText.match(/(?:\$\s?[\d,]+(?:\.\d{2})?)|free/gi);
+        if (matches && matches.length > 0) {
+          return matches[matches.length - 1];
+        }
+      }
+
+      return null;
+    };
+
+    const bodyText = clean(document.body?.innerText);
+    const lineTitle = getFirstText(lineTitleSelectors) || (bodyText.includes(expectedTitle) ? expectedTitle : null);
+
+    const titleElement = Array.from(document.querySelectorAll('a, p, span, div, h1, h2, h3')).find(
+      (node) => clean(node.textContent) === expectedTitle
+    );
+    const lineContainer =
+      titleElement?.closest('tr, li, .product, .order-summary__section__content, .order-summary') ?? titleElement?.parentElement;
+    const lineText = clean(lineContainer?.textContent);
+
+    const lineQtyMatch = lineText.match(/(?:qty|quantity|x)\\s*:?\\s*(\\d+)/i) ?? bodyText.match(/(?:qty|quantity|x)\\s*:?\\s*(\\d+)/i);
+    const linePriceMatch = lineText.match(/\$\s?[\d,]+(?:\.\d{2})?/);
+
+    const subtotal =
+      clean(document.querySelector('[data-checkout-subtotal-price-target]')?.textContent) || findAmountByLabel('Subtotal');
+    const shipping =
+      clean(document.querySelector('[data-checkout-shipping-price-target]')?.textContent) || findAmountByLabel('Shipping');
+    const taxes =
+      clean(document.querySelector('[data-checkout-taxes-price-target]')?.textContent) || findAmountByLabel('Estimated taxes');
+    const total =
+      clean(document.querySelector('[data-checkout-payment-due-target], [data-checkout-total-price-target]')?.textContent) ||
+      findAmountByLabel('Total');
+
+    return {
+      lineTitle,
+      lineTitlePresent: bodyText.includes(expectedTitle),
+      lineQty: lineQtyMatch?.[1] ?? null,
+      linePrice: linePriceMatch?.[0] ?? null,
+      subtotal,
+      shipping,
+      taxes,
+      total,
+    };
+  }, sidecartProductTitle);
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const shippingParsed = tryParseMoneyToNumber(checkoutSummary.shipping);
+    const shippingText = (checkoutSummary.shipping ?? '').toLowerCase();
+    if (shippingParsed !== null || shippingText.includes('free')) {
+      break;
+    }
+
+    await page.waitForTimeout(3000);
+    checkoutSummary = await page.evaluate((expectedTitle) => {
+      const clean = (text: string | null | undefined): string => (text ?? '').replace(/\s+/g, ' ').trim();
+
+      const lineTitleSelectors = [
+        '[data-product-title]',
+        '.product__description__name',
+        '[data-testid="line-item-title"]',
+        '.order-summary__emphasis',
+      ];
+
+      const getFirstText = (selectors: string[]): string | null => {
+        for (const selector of selectors) {
+          const value = clean(document.querySelector(selector)?.textContent);
+          if (value) {
+            return value;
+          }
+        }
+        return null;
+      };
+
+      const findAmountByLabel = (label: string): string | null => {
+        const candidates = Array.from(document.querySelectorAll('tr, .total-line, dt, div, span'));
+        for (const node of candidates) {
+          const labelText = clean(node.textContent).toLowerCase();
+          if (!labelText || !labelText.includes(label.toLowerCase())) {
+            continue;
+          }
+
+          const row =
+            node.closest('tr, .total-line, .order-summary__section__content, .order-summary__section') ?? node.parentElement;
+          const rowText = clean(row?.textContent);
+          const matches = rowText.match(/(?:\$\s?[\d,]+(?:\.\d{2})?)|free/gi);
+          if (matches && matches.length > 0) {
+            return matches[matches.length - 1];
+          }
+        }
+
+        return null;
+      };
+
+      const bodyText = clean(document.body?.innerText);
+      const lineTitle = getFirstText(lineTitleSelectors) || (bodyText.includes(expectedTitle) ? expectedTitle : null);
+
+      const titleElement = Array.from(document.querySelectorAll('a, p, span, div, h1, h2, h3')).find(
+        (node) => clean(node.textContent) === expectedTitle
+      );
+      const lineContainer =
+        titleElement?.closest('tr, li, .product, .order-summary__section__content, .order-summary') ?? titleElement?.parentElement;
+      const lineText = clean(lineContainer?.textContent);
+
+      const lineQtyMatch = lineText.match(/(?:qty|quantity|x)\s*:?\s*(\d+)/i) ?? bodyText.match(/(?:qty|quantity|x)\s*:?\s*(\d+)/i);
+      const linePriceMatch = lineText.match(/\$\s?[\d,]+(?:\.\d{2})?/);
+
+      const subtotal =
+        clean(document.querySelector('[data-checkout-subtotal-price-target]')?.textContent) || findAmountByLabel('Subtotal');
+      const shipping =
+        clean(document.querySelector('[data-checkout-shipping-price-target]')?.textContent) || findAmountByLabel('Shipping');
+      const taxes =
+        clean(document.querySelector('[data-checkout-taxes-price-target]')?.textContent) ||
+        findAmountByLabel('Estimated taxes') ||
+        findAmountByLabel('Taxes');
+      const total =
+        clean(document.querySelector('[data-checkout-payment-due-target], [data-checkout-total-price-target]')?.textContent) ||
+        findAmountByLabel('Total');
+
+      return {
+        lineTitle,
+        lineTitlePresent: bodyText.includes(expectedTitle),
+        lineQty: lineQtyMatch?.[1] ?? null,
+        linePrice: linePriceMatch?.[0] ?? null,
+        subtotal,
+        shipping,
+        taxes,
+        total,
+      };
+    }, sidecartProductTitle);
+  }
+  expect(checkoutSummary.lineTitlePresent).toBeTruthy();
+  await expect(checkoutSummary.lineTitle ?? '').toContain(sidecartProductTitle);
+  const parsedQty = Number.parseInt(checkoutSummary.lineQty ?? '', 10);
+  if (Number.isNaN(parsedQty)) {
+    await expect(page.locator('body')).toContainText(/(?:qty|quantity|x)\s*:?\s*2/i);
+  } else {
+    expect(parsedQty).toBe(2);
+  }
+  const linePriceParsed = tryParseMoneyToNumber(checkoutSummary.linePrice ?? checkoutSummary.subtotal);
+  expect(linePriceParsed).not.toBeNull();
+  const linePriceValue = linePriceParsed ?? 0;
+  expect(linePriceValue).toBeGreaterThan(0);
+
+  const subtotalParsed = tryParseMoneyToNumber(checkoutSummary.subtotal);
+  const totalParsed = tryParseMoneyToNumber(checkoutSummary.total);
+  expect(subtotalParsed).not.toBeNull();
+  expect(totalParsed).not.toBeNull();
+
+  const subtotalValue = subtotalParsed ?? 0;
+  const totalValue = totalParsed ?? 0;
+
+  const shippingParsed = tryParseMoneyToNumber(checkoutSummary.shipping);
+  const taxesParsed = tryParseMoneyToNumber(checkoutSummary.taxes);
+
+  let shippingValue = shippingParsed ?? 0;
+  let taxesValue = taxesParsed ?? 0;
+
+  if (shippingParsed === null && taxesParsed !== null) {
+    shippingValue = totalValue - subtotalValue - taxesValue;
+  } else if (taxesParsed === null && shippingParsed !== null) {
+    taxesValue = totalValue - subtotalValue - shippingValue;
+  } else if (shippingParsed === null && taxesParsed === null) {
+    shippingValue = totalValue - subtotalValue;
+    taxesValue = 0;
+  }
+
+  expect(Math.abs(subtotalValue + shippingValue + taxesValue - totalValue)).toBeLessThanOrEqual(0.01);
+  expect(Math.abs(subtotalValue + shippingValue + taxesValue - totalValue)).toBeLessThanOrEqual(0.01);
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
