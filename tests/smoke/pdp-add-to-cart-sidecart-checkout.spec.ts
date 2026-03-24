@@ -7,9 +7,9 @@ import { SearchResultsPage } from '../../src/pages/search-results.page';
 import { ShipNationwidePage } from '../../src/pages/ship-nationwide.page';
 import { SideCartComponent } from '../../src/pages/sidecart.component';
 import { pauseIfRequested } from '../helpers/debug';
+import { setDeliveryDateAndZip } from '../helpers/delivery';
+import { NATIONWIDE_ORDER_DATA, TEST_PRODUCT } from '../test-data/checkout.data';
 
-const PDP_URL = 'https://georgetowncupcake.com/products/logo-t-shirt-black';
-const CONTACT_EMAIL = 'test+10@mtnhausdigital.com';
 const tryParseMoneyToNumber = (raw: string | null): number | null => {
   if (!raw) {
     return null;
@@ -69,39 +69,31 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
   const finalCheckoutButtonSelector =
     '#shopify-section-template--19484127920355__cart-section > cart-items-component > div.section.color-scheme-1.section--page-width > div > div.cart-page__summary._active > div.cart__summary-content.border-style.cart__container--extend.color-scheme-3.inherit-parent-scheme--mobile > div > div > div.cart__summary-totals > div.cart__ctas.cart__ctas--desktop > button';
 
-  await pdp.open(PDP_URL);
+  await pdp.open(TEST_PRODUCT.pdpUrl);
   await overlays.dismissAll();
 
   await pdp.hoverShippingInfo();
   await pdp.clickShipNationwideLink();
   await expect(page).toHaveURL(`${baseURL}/pages/ship-nationwide`);
 
-  await ship.focusDeliveryDate();
-  const deliverySelection = await ship.selectFirstValidDateStartingFromMinDate();
-  await test.info().attach('delivery-date-selection', {
-    body: JSON.stringify(deliverySelection, null, 2),
-    contentType: 'application/json',
-  });
-  console.log('[delivery-date-selection]', JSON.stringify(deliverySelection));
-
-  await ship.setZip('10001');
+  const deliverySelection = await setDeliveryDateAndZip(ship, NATIONWIDE_ORDER_DATA.zipCode, test.info());
 
   await header.openSearch();
-  await header.searchForAndSubmit('Logo T-shirt (Black)');
+  await header.searchForAndSubmit(TEST_PRODUCT.searchQuery);
 
   await results.openFirstProductResult();
 
   await pdp.selectSizeM();
-  await pdp.setQty(2);
-  await expect(await pdp.getQty()).toBe(2);
+  await pdp.setQty(TEST_PRODUCT.quantity);
+  await expect(await pdp.getQty()).toBe(TEST_PRODUCT.quantity);
 
   await pdp.addToCart();
   await pauseIfRequested(page);
 
   const sidecartProductTitle = await sidecart.getProductTitle();
   await expect(sidecartProductTitle).not.toBe('');
-  await expect(await sidecart.getVariantValue()).toBe('M');
-  await expect(await sidecart.getQtyValue()).toBe(2);
+  await expect(await sidecart.getVariantValue()).toBe(TEST_PRODUCT.size);
+  await expect(await sidecart.getQtyValue()).toBe(TEST_PRODUCT.quantity);
   await expect((await sidecart.getShippingValue()).toLowerCase()).toBe('shipping');
 
   const selectedDeliveryDate = deliverySelection.selectedDate;
@@ -111,7 +103,7 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
 
   const sidecartDeliveryDate = await sidecart.getDateValue();
   await expect(sidecartDeliveryDate).not.toBe('');
-  await expect(await sidecart.getZipValue()).toBe('10001');
+  await expect(await sidecart.getZipValue()).toBe(NATIONWIDE_ORDER_DATA.zipCode);
 
   await sidecart.clickCheckoutLink();
 
@@ -127,8 +119,8 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
 
   const contactEmailInput = page.locator('#customer_contact');
   await expect(contactEmailInput).toBeVisible();
-  await contactEmailInput.fill(CONTACT_EMAIL);
-  await expect(contactEmailInput).toHaveValue(CONTACT_EMAIL);
+  await contactEmailInput.fill(NATIONWIDE_ORDER_DATA.contactEmail);
+  await expect(contactEmailInput).toHaveValue(NATIONWIDE_ORDER_DATA.contactEmail);
 
   const shippingSettings = page.locator(shippingSettingsSelector).first();
   await expect(shippingSettings).toBeVisible();
@@ -150,21 +142,24 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
   await expect(firstNameInput).toBeVisible();
 
   await firstNameInput.click({ timeout: 5000 }).catch(() => undefined);
-  await firstNameInput.fill('Test').catch(() => undefined);
+  await firstNameInput.fill(NATIONWIDE_ORDER_DATA.recipient.firstName).catch(() => undefined);
 
   if ((await firstNameInput.inputValue().catch(() => '')) === '') {
     await firstNameInput.press('Control+A').catch(() => undefined);
-    await firstNameInput.type('Test', { delay: 40 }).catch(() => undefined);
+    await firstNameInput.type(NATIONWIDE_ORDER_DATA.recipient.firstName, { delay: 40 }).catch(() => undefined);
   }
 
   if ((await firstNameInput.inputValue().catch(() => '')) === '') {
-    await firstNameInput.evaluate((node) => {
-      if (node instanceof HTMLInputElement) {
-        node.value = 'Test';
-        node.dispatchEvent(new Event('input', { bubbles: true }));
-        node.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-    });
+    await firstNameInput.evaluate(
+      (node, firstName) => {
+        if (node instanceof HTMLInputElement) {
+          node.value = firstName;
+          node.dispatchEvent(new Event('input', { bubbles: true }));
+          node.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      },
+      NATIONWIDE_ORDER_DATA.recipient.firstName
+    );
   }
 
   await expect(firstNameInput).toHaveValue(/\S+/, { timeout: 10000 });
@@ -173,18 +168,18 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
     .locator("#new-address-popup input[name='address[last_name]'], #new-address-popup input[id*='addresslast_name']")
     .first();
   await expect(lastNameInput).toBeVisible();
-  await lastNameInput.fill('User');
+  await lastNameInput.fill(NATIONWIDE_ORDER_DATA.recipient.lastName);
 
   const phoneInput = page
     .locator("#new-address-popup input[name='address[phone]'], #new-address-popup input[id*='addressphone']")
     .first();
   await expect(phoneInput).toBeVisible();
-  await phoneInput.fill('2125551234');
+  await phoneInput.fill(NATIONWIDE_ORDER_DATA.recipient.phone);
 
   const address1Input = page.locator('#address1_1');
   await expect(address1Input).toBeVisible();
   await address1Input.fill('');
-  await address1Input.type('340 W 28th St Apt 9j, New York, NY 10001', { delay: 35 });
+  await address1Input.type(NATIONWIDE_ORDER_DATA.recipient.addressLine1, { delay: 35 });
 
   const firstAddressSuggestion = page.locator(addressAutocompleteFirstSuggestionSelector).first();
   await expect(firstAddressSuggestion).toBeVisible({ timeout: 15000 });
@@ -451,29 +446,4 @@ test('add logo t-shirt black to cart and verify sidecart details with checkout c
   expect(Math.abs(subtotalValue + shippingValue + taxesValue - totalValue)).toBeLessThanOrEqual(0.01);
   expect(Math.abs(subtotalValue + shippingValue + taxesValue - totalValue)).toBeLessThanOrEqual(0.01);
 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
