@@ -8,8 +8,7 @@ import { ShipNationwidePage } from '../../src/pages/ship-nationwide.page';
 import { SideCartComponent } from '../../src/pages/sidecart.component';
 import { pauseIfRequested } from '../helpers/debug';
 import { setDeliveryDateAndZip } from '../helpers/delivery';
-
-const PDP_URL = 'https://georgetowncupcake.com/products/logo-t-shirt-black';
+import { NATIONWIDE_ORDER_DATA, TEST_PRODUCT } from '../test-data/checkout.data';
 
 test('add logo t-shirt black to cart and verify sidecart details', async ({ page, baseURL }) => {
   test.setTimeout(90000);
@@ -20,31 +19,31 @@ test('add logo t-shirt black to cart and verify sidecart details', async ({ page
   const results = new SearchResultsPage(page);
   const sidecart = new SideCartComponent(page);
 
-  await pdp.open(PDP_URL);
+  await pdp.open(TEST_PRODUCT.pdpUrl);
   await overlays.dismissAll();
 
   await pdp.hoverShippingInfo();
   await pdp.clickShipNationwideLink();
   await expect(page).toHaveURL(`${baseURL}/pages/ship-nationwide`);
 
-  const deliverySelection = await setDeliveryDateAndZip(ship, '10001', test.info());
+  const deliverySelection = await setDeliveryDateAndZip(ship, NATIONWIDE_ORDER_DATA.zipCode, test.info());
 
   await header.openSearch();
-  await header.searchForAndSubmit('Logo T-shirt (Black)');
+  await header.searchForAndSubmit(TEST_PRODUCT.searchQuery);
 
   await results.openFirstProductResult();
 
   await pdp.selectSizeM();
-  await pdp.setQty(2);
-  await expect(await pdp.getQty()).toBe(2);
+  await pdp.setQty(TEST_PRODUCT.quantity);
+  await expect(await pdp.getQty()).toBe(TEST_PRODUCT.quantity);
 
   await pdp.addToCart();
   await pauseIfRequested(page);
 
   await expect(await sidecart.getProductTitle()).not.toBe('');
-  await expect(await sidecart.getVariantValue()).toBe('M');
-  await expect(await sidecart.getQtyValue()).toBe(2);
+  await expect(await sidecart.getVariantValue()).toBe(TEST_PRODUCT.size);
+  await expect(await sidecart.getQtyValue()).toBe(TEST_PRODUCT.quantity);
   await expect((await sidecart.getShippingValue()).toLowerCase()).toBe('shipping');
-  await expect(await sidecart.getZipValue()).toBe('10001');
+  await expect(await sidecart.getZipValue()).toBe(NATIONWIDE_ORDER_DATA.zipCode);
 });
 
