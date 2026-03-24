@@ -7,6 +7,7 @@ import { SearchResultsPage } from '../../src/pages/search-results.page';
 import { ShipNationwidePage } from '../../src/pages/ship-nationwide.page';
 import { SideCartComponent } from '../../src/pages/sidecart.component';
 import { pauseIfRequested } from '../helpers/debug';
+import { setDeliveryDateAndZip } from '../helpers/delivery';
 
 const PDP_URL = 'https://georgetowncupcake.com/products/logo-t-shirt-black';
 
@@ -26,15 +27,7 @@ test('add logo t-shirt black to cart and verify sidecart details', async ({ page
   await pdp.clickShipNationwideLink();
   await expect(page).toHaveURL(`${baseURL}/pages/ship-nationwide`);
 
-  await ship.focusDeliveryDate();
-  const deliverySelection = await ship.selectFirstValidDateStartingFromMinDate();
-  await test.info().attach('delivery-date-selection', {
-    body: JSON.stringify(deliverySelection, null, 2),
-    contentType: 'application/json',
-  });
-  console.log('[delivery-date-selection]', JSON.stringify(deliverySelection));
-
-  await ship.setZip('10001');
+  const deliverySelection = await setDeliveryDateAndZip(ship, '10001', test.info());
 
   await header.openSearch();
   await header.searchForAndSubmit('Logo T-shirt (Black)');
@@ -54,3 +47,4 @@ test('add logo t-shirt black to cart and verify sidecart details', async ({ page
   await expect((await sidecart.getShippingValue()).toLowerCase()).toBe('shipping');
   await expect(await sidecart.getZipValue()).toBe('10001');
 });
+
