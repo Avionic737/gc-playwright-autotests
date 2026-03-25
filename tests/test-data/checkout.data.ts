@@ -15,3 +15,14 @@ export const NATIONWIDE_ORDER_DATA = {
     addressLine1: '340 W 28th St Apt 9j, New York, NY 10001',
   },
 } as const;
+
+export const BYOB_CUSTOM_DOZEN_DATA = {
+  shipNationwideUrl: 'https://georgetowncupcake.com/pages/ship-nationwide',
+  customDozenUrl: 'https://georgetowncupcake.com/products/custom-dozen',
+  flavorName: 'Red Velvet',
+  flavorQty: 12,
+  bundleQty: 2,
+  expectedSidecartTitle: 'Custom Dozen',
+  expectedVariant: 'Red Velvet X 12',
+  expectedLinePrice: '$84.00',
+} as const;

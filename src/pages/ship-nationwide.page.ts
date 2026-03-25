@@ -3,8 +3,10 @@ import { expect } from '@playwright/test';
 
 import {
   ALL_DAY_CELLS,
+  DELIVERY_CUSTOM_DOZEN_GET_STARTED_CTA,
   DELIVERY_DATE_INPUT,
   DELIVERY_ERROR,
+  DELIVERY_ZIP_BLUR_CLICK_TARGET,
   DELIVERY_ZIP_INPUT,
   MIN_DATE_DAY_CELL,
 } from '../locators/shipping.selectors';
@@ -55,7 +57,44 @@ export class ShipNationwidePage {
 
   async setZip(zipCode: string): Promise<void> {
     await this.dismissBlockingUi();
-    await this.page.locator(DELIVERY_ZIP_INPUT).fill(zipCode, { timeout: 2000 });
+
+    const zipInput = this.page.locator(DELIVERY_ZIP_INPUT);
+    await expect(zipInput).toBeVisible({ timeout: 5000 });
+    await zipInput.fill(zipCode, { timeout: 2000 });
+
+    await zipInput.evaluate((node) => {
+      if (node instanceof HTMLInputElement) {
+        node.dispatchEvent(new Event('input', { bubbles: true }));
+        node.dispatchEvent(new Event('change', { bubbles: true }));
+        node.blur();
+      }
+    });
+
+    const blurTarget = this.page.locator(DELIVERY_ZIP_BLUR_CLICK_TARGET).first();
+    await expect(blurTarget).toBeVisible({ timeout: 10000 });
+    await blurTarget.scrollIntoViewIfNeeded().catch(() => undefined);
+
+    await blurTarget.click({ force: true, timeout: 5000 }).catch(async () => {
+      await blurTarget.evaluate((node) => {
+        if (node instanceof HTMLElement) {
+          node.click();
+        }
+      });
+    });
+
+    await this.page
+      .waitForFunction(
+        () => {
+          const active = document.activeElement as HTMLElement | null;
+          return active?.id !== 'delivery-zip';
+        },
+        null,
+        { timeout: 10000 }
+      )
+      .catch(() => undefined);
+
+    const customDozenCta = this.page.locator(DELIVERY_CUSTOM_DOZEN_GET_STARTED_CTA).first();
+    await expect(customDozenCta).toBeVisible({ timeout: 20000 });
   }
 
   async selectFirstValidDateStartingFromMinDate(): Promise<DeliveryDateSelectionReport> {
@@ -272,6 +311,13 @@ export class ShipNationwidePage {
     });
   }
 }
+
+
+
+
+
+
+
 
 
 
