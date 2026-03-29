@@ -4,6 +4,7 @@ import { expect } from '@playwright/test';
 import {
   ALL_DAY_CELLS,
   DELIVERY_CUSTOM_DOZEN_GET_STARTED_CTA,
+  DELIVERY_FLAVOR_BAR_GET_STARTED_CTA,
   DELIVERY_DATE_INPUT,
   DELIVERY_ERROR,
   DELIVERY_ZIP_BLUR_CLICK_TARGET,
@@ -97,6 +98,36 @@ export class ShipNationwidePage {
     await expect(customDozenCta).toBeVisible({ timeout: 20000 });
   }
 
+  async clickFlavorBarGetStarted(): Promise<void> {
+    await this.dismissBlockingUi();
+    await this.page.locator(DELIVERY_ZIP_INPUT).press('Tab').catch(() => undefined);
+
+    const scopedFlavorBarCta = this.page.locator(DELIVERY_FLAVOR_BAR_GET_STARTED_CTA).first();
+    const hrefBasedFallback = this.page
+      .locator('a[href="/products/flavor-bar"]')
+      .filter({ hasText: /get started/i })
+      .first();
+
+    await expect
+      .poll(async () => {
+        if (await scopedFlavorBarCta.isVisible().catch(() => false)) {
+          return 'scoped-visible';
+        }
+        if (await hrefBasedFallback.isVisible().catch(() => false)) {
+          return 'href-visible';
+        }
+        return 'hidden';
+      }, { timeout: 30000 })
+      .not.toBe('hidden');
+
+    if (await scopedFlavorBarCta.isVisible().catch(() => false)) {
+      await scopedFlavorBarCta.click();
+      return;
+    }
+
+    await expect(hrefBasedFallback).toBeVisible();
+    await hrefBasedFallback.click();
+  }
   async selectFirstValidDateStartingFromMinDate(): Promise<DeliveryDateSelectionReport> {
     await this.dismissBlockingUi();
 

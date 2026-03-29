@@ -14,3 +14,6 @@ export const DELIVERY_ZIP_BLUR_CLICK_TARGET =
 
 export const DELIVERY_CUSTOM_DOZEN_GET_STARTED_CTA =
   '#shopify-section-template--20157684613347__image_text_grid_nationwide > div > div.image-text-grid__container > div:nth-child(2) > div > div.image-text-grid__content > a[href="/products/custom-dozen"]';
+
+export const DELIVERY_FLAVOR_BAR_GET_STARTED_CTA =
+  '#shopify-section-template--20157684613347__image_text_grid_nationwide > div > div.image-text-grid__container > div:nth-child(1) > div > div.image-text-grid__content > a[href="/products/flavor-bar"]';
