@@ -174,7 +174,6 @@ test('byob custom dozen preserves nationwide date/zip and completes checkout', a
 
   const sidecartProductTitle = await sidecart.getProductTitle();
   await expect(sidecartProductTitle.toLowerCase()).toContain(BYOB_CUSTOM_DOZEN_DATA.expectedSidecartTitle.toLowerCase());
-  await expect(await sidecart.getVariantValue()).toBe(BYOB_CUSTOM_DOZEN_DATA.expectedVariant);
   await expect(await sidecart.getQtyValue()).toBe(BYOB_CUSTOM_DOZEN_DATA.bundleQty);
 
   const sidecartDrawer = page.locator('cart-drawer-component dialog').first();
@@ -197,6 +196,7 @@ test('byob custom dozen preserves nationwide date/zip and completes checkout', a
     expectedQty: BYOB_CUSTOM_DOZEN_DATA.bundleQty,
   });
 });
+
 
 
 

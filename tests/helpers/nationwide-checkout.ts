@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test';
 import { expect } from '@playwright/test';
 
+import { extractCheckoutTotalsMetrics } from './checkout-totals';
+
 type RecipientData = {
   firstName: string;
   lastName: string;
@@ -226,6 +228,20 @@ export async function assertCheckoutLineAndTotals(
   const linePriceValue = linePriceParsed ?? 0;
   expect(linePriceValue).toBeGreaterThan(0);
 
+  const checkoutTotals = await extractCheckoutTotalsMetrics(page);
+  console.log(`[checkout-totals-debug] ${JSON.stringify(checkoutTotals)}`);
+
+  if (
+    checkoutTotals.subtotal !== null &&
+    checkoutTotals.shipping !== null &&
+    checkoutTotals.taxes !== null &&
+    checkoutTotals.total !== null
+  ) {
+    const delta = Math.abs(checkoutTotals.subtotal + checkoutTotals.shipping + checkoutTotals.taxes - checkoutTotals.total);    console.log(`[#calc] subtotal=${checkoutTotals.subtotal} shipping=${checkoutTotals.shipping} taxes=${checkoutTotals.taxes} total=${checkoutTotals.total} delta=${delta}`);
+    expect(delta).toBeLessThanOrEqual(0.01);
+    return;
+  }
+
   const subtotalParsed = tryParseMoneyToNumber(checkoutSummary.subtotal);
   const totalParsed = tryParseMoneyToNumber(checkoutSummary.total);
   expect(subtotalParsed).not.toBeNull();
@@ -249,7 +265,10 @@ export async function assertCheckoutLineAndTotals(
     taxesValue = 0;
   }
 
-  expect(Math.abs(subtotalValue + shippingValue + taxesValue - totalValue)).toBeLessThanOrEqual(0.01);
+  const delta = Math.abs(subtotalValue + shippingValue + taxesValue - totalValue);
+  console.log(`[checkout-summary-raw] ${JSON.stringify(checkoutSummary)}`);
+  console.log(`[#calc-fallback] subtotal=${subtotalValue} shipping=${shippingValue} taxes=${taxesValue} total=${totalValue} delta=${delta}`);
+  expect(delta).toBeLessThanOrEqual(0.01);
 }
 
 async function readCheckoutSummary(page: Page, expectedTitle: string): Promise<CheckoutSummary> {
@@ -348,3 +367,7 @@ function tryParseMoneyToNumber(raw: string | null): number | null {
 
   return Number.parseFloat(match[0]);
 }
+
+
+
+
