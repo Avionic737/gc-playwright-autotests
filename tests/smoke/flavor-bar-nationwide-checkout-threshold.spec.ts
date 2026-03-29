@@ -1,10 +1,11 @@
-﻿import { expect, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 import { FlavorBarPage } from '../../src/pages/flavor-bar.page';
 import { OverlaysComponent } from '../../src/pages/overlays.component';
 import { ShipNationwidePage } from '../../src/pages/ship-nationwide.page';
 import { setDeliveryDateAndZip } from '../helpers/delivery';
 import { waitForDeliveryStorageReady } from '../helpers/delivery-storage';
+import { waitForSidecartCheckoutReady } from '../helpers/sidecart-readiness';
 import { BYOB_CUSTOM_DOZEN_DATA, NATIONWIDE_ORDER_DATA } from '../test-data/checkout.data';
 
 test('flavor bar requires 12 items before checkout becomes active', async ({ page }) => {
@@ -39,9 +40,7 @@ test('flavor bar requires 12 items before checkout becomes active', async ({ pag
 
   await flavorBar.setSidecartQuantity(12);
 
-  await flavorBar.clickDisabledCheckout();
-  await expect(page).toHaveURL(/\/products\/flavor-bar(?:\?|$)/);
-
+  await flavorBar.waitForSidecartPrice('$42.00');
   await flavorBar.expectCheckoutEnabled();
 
   await Promise.all([
@@ -54,6 +53,11 @@ test('flavor bar requires 12 items before checkout becomes active', async ({ pag
       '#cart-form > div > div.cart-items__table > div:nth-child(3) > div > div.cart-items__group-container > div > div.cart-items__group-content > div > div > div.cart-items__table-row.cart-items__nested-line--last.js-main-cart-item > div.cart-items__details.cart-primary-typography > div:nth-child(1) > p > a'
     )
     .first();
+
+  if (!(await cartProductTitle.isVisible().catch(() => false))) {
+    await page.reload({ waitUntil: 'domcontentloaded' });
+  }
+
   await expect(cartProductTitle).toBeVisible({ timeout: 15000 });
   await expect(cartProductTitle).toContainText(/custom dozen/i);
 

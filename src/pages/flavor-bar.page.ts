@@ -11,6 +11,8 @@ const DISABLED_CHECKOUT_SPAN =
   '#header-component > div > div > div.header__column.header__column--right > header-actions > cart-drawer-component > dialog > div > cart-items-component > div.cart-drawer__content.motion-reduce > div > div > div.cart__ctas > span';
 const ACTIVE_CHECKOUT_LINK =
   '#header-component > div > div > div.header__column.header__column--right > header-actions > cart-drawer-component > dialog > div > cart-items-component > div.cart-drawer__content.motion-reduce > div > div > div.cart__ctas > a';
+const SIDECART_LINE_PRICE =
+  '#cart-form > div > div > div:nth-child(3) > div.cart-items__table-row > div.cart-items__price.cart-secondary-typography > text-component';
 
 export class FlavorBarPage {
   constructor(private readonly page: Page) {}
@@ -60,6 +62,12 @@ export class FlavorBarPage {
         return Number.parseInt(raw, 10);
       }, { timeout: 15000 })
       .toBe(value);
+  }
+
+  async waitForSidecartPrice(expectedPrice: string): Promise<void> {
+    const price = this.page.locator(SIDECART_LINE_PRICE).first();
+    await expect(price).toBeVisible({ timeout: 15000 });
+    await expect(price).toHaveText(expectedPrice, { timeout: 30000 });
   }
 
   async expectCheckoutEnabled(): Promise<void> {
